@@ -1,7 +1,7 @@
 import GridLayout, { type Layout, WidthProvider } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 
 export type GridItem = {
   i: string
@@ -29,17 +29,16 @@ export function DashboardGrid({ conflictId, initialLayout, renderItem }: Dashboa
     try { return JSON.parse(raw) as GridItem[] } catch { return null }
   }, [conflictId])
 
-  const [layout, setLayout] = useState<GridItem[]>(saved ?? initialLayout)
+  const effectiveLayout = saved ?? initialLayout
 
-  useEffect(() => {
-    localStorage.setItem(lsKey(conflictId), JSON.stringify(layout))
-  }, [conflictId, layout])
-
+  const lastSavedJson = useRef<string | null>(null)
   const onLayoutChange = useCallback((l: Layout[]) => {
-    // Map RGL layout back to our type
     const mapped: GridItem[] = l.map(it => ({ i: it.i, x: it.x, y: it.y, w: it.w, h: it.h }))
-    setLayout(mapped)
-  }, [])
+    const json = JSON.stringify(mapped)
+    if (lastSavedJson.current === json) return
+    lastSavedJson.current = json
+    localStorage.setItem(lsKey(conflictId), json)
+  }, [conflictId])
 
   const RGL = WidthProvider(GridLayout)
 
@@ -52,10 +51,9 @@ export function DashboardGrid({ conflictId, initialLayout, renderItem }: Dashboa
         isDraggable
         isResizable
         onLayoutChange={onLayoutChange}
-        layout={layout as Layout[]}
       >
-        {layout.map(it => (
-          <div key={it.i} className="bg-white border rounded shadow">
+        {effectiveLayout.map(it => (
+          <div key={it.i} data-grid={it} className="bg-white border rounded shadow">
             {renderItem(it.i)}
           </div>
         ))}

@@ -1,0 +1,17 @@
+# General
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+/dist
+/web/dist
+
+# Dependencies
+/node_modules
+/web/node_modules
+
+# Editor
+.vscode/
