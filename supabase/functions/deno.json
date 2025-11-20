@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.ns", "dom"]
+  },
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.48.0",
+    "std/http/server.ts": "https://deno.land/std@0.177.0/http/server.ts"
+  }
+}

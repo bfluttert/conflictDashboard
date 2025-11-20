@@ -16,20 +16,27 @@ export type DashboardGridProps = {
   conflictId: string
   initialLayout: GridItem[]
   renderItem: (id: string) => React.ReactNode
+  overrideLayout?: GridItem[]
+  onPersist?: (layout: GridItem[]) => void
 }
 
 function lsKey(conflictId: string) {
   return `layout:${conflictId}`
 }
 
-export function DashboardGrid({ conflictId, initialLayout, renderItem }: DashboardGridProps) {
+export function DashboardGrid({ conflictId, initialLayout, renderItem, overrideLayout, onPersist }: DashboardGridProps) {
   const saved = useMemo(() => {
     const raw = localStorage.getItem(lsKey(conflictId))
     if (!raw) return null
     try { return JSON.parse(raw) as GridItem[] } catch { return null }
   }, [conflictId])
 
-  const effectiveLayout = saved ?? initialLayout
+  const effectiveLayout = useMemo(() => {
+    const base = overrideLayout ?? saved ?? initialLayout
+    const ids = new Set(base.map(it => it.i))
+    const missing = initialLayout.filter(it => !ids.has(it.i))
+    return missing.length ? [...base, ...missing] : base
+  }, [overrideLayout, saved, initialLayout])
 
   const lastSavedJson = useRef<string | null>(null)
   const onLayoutChange = useCallback((l: Layout[]) => {
@@ -37,8 +44,12 @@ export function DashboardGrid({ conflictId, initialLayout, renderItem }: Dashboa
     const json = JSON.stringify(mapped)
     if (lastSavedJson.current === json) return
     lastSavedJson.current = json
-    localStorage.setItem(lsKey(conflictId), json)
-  }, [conflictId])
+    if (onPersist) {
+      onPersist(mapped)
+    } else {
+      localStorage.setItem(lsKey(conflictId), json)
+    }
+  }, [conflictId, onPersist])
 
   const RGL = WidthProvider(GridLayout)
 
