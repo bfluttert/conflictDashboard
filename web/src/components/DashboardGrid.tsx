@@ -61,6 +61,7 @@ export function DashboardGrid({ conflictId, initialLayout, renderItem, overrideL
         rowHeight={30}
         isDraggable
         isResizable
+        draggableCancel=".no-drag"
         onLayoutChange={onLayoutChange}
       >
         {effectiveLayout.map(it => (

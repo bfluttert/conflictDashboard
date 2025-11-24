@@ -1,10 +1,18 @@
-import { useState } from 'react'
-import { useConflictNumbers } from '../hooks/useConflictNumbers'
+import { useState, useMemo } from 'react'
+import { useConflictNumbers, aggregate } from '../hooks/useConflictNumbers'
 import { useCountryIso3 } from '../hooks/useCountryIso3'
 import { useUnhcrDisplacement } from '../hooks/useUnhcrDisplacement'
+import type { GedEvent } from '../lib/ucdp'
 
-export default function NumbersTile({ conflictId, countryId }: { conflictId: number; countryId?: number }) {
-  const { data, isLoading, error } = useConflictNumbers(conflictId, countryId)
+export default function NumbersTile({ conflictId, countryId, events }: { conflictId?: number; countryId?: number; events?: GedEvent[] }) {
+  const { data: hookData, isLoading: hookLoading, error } = useConflictNumbers(conflictId, countryId)
+
+  const data = useMemo(() => {
+    if (events) return { numbers: aggregate(events) }
+    return hookData
+  }, [events, hookData])
+
+  const isLoading = !events && hookLoading
   const iso3State = useCountryIso3(countryId ?? NaN)
   const { data: dispData, isLoading: dispLoading } = useUnhcrDisplacement(iso3State.iso3 ?? undefined)
 
@@ -15,7 +23,7 @@ export default function NumbersTile({ conflictId, countryId }: { conflictId: num
   })
 
   if (isLoading) return <div className="p-3 text-sm">Loading numbers…</div>
-  if (error) return <div className="p-3 text-sm text-red-600">Failed to load numbers</div>
+  if (error && !events) return <div className="p-3 text-sm text-red-600">Failed to load numbers</div>
   if (!data) return <div className="p-3 text-sm">No data</div>
   const n = data.numbers
   const d = dispData?.displacement
@@ -58,10 +66,9 @@ export default function NumbersTile({ conflictId, countryId }: { conflictId: num
                   [kk]: !prev[kk],
                 }))
               }
-              className={`rounded border p-2 text-left cursor-pointer transition-colors ${
-                active ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200 opacity-70'
-              }`}
-           >
+              className={`rounded border p-2 text-left cursor-pointer transition-colors ${active ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200 opacity-70'
+                }`}
+            >
               <div className="text-xs text-gray-500">{typeLabels[kk]}</div>
               <div className="font-medium">{n.byType[kk].toLocaleString()}</div>
             </button>

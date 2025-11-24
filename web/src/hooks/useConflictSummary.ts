@@ -8,13 +8,13 @@ export type ConflictSummary = {
 }
 
 export function useConflictSummary(
-  conflictId: number,
+  conflictId?: number,
   countryId?: number,
   meta?: { conflictName?: string | null; countryName?: string | null },
 ) {
   return useQuery<ConflictSummary, Error>({
     queryKey: ['conflictSummary', conflictId, countryId],
-    enabled: Number.isFinite(conflictId),
+    enabled: Number.isFinite(conflictId) || Number.isFinite(countryId),
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('conflict-summary', {
         body: {

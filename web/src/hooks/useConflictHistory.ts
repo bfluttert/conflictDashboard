@@ -7,7 +7,7 @@ export type YearHistory = {
   byType: Record<1 | 2 | 3, number>
 }
 
-function aggregateHistory(events: GedEvent[]): YearHistory[] {
+export function aggregateHistory(events: GedEvent[]): YearHistory[] {
   const byYear = new Map<number, { totalBest: number; byType: Record<1 | 2 | 3, number> }>()
 
   for (const e of events) {
@@ -32,10 +32,10 @@ function aggregateHistory(events: GedEvent[]): YearHistory[] {
     .sort((a, b) => a.year - b.year)
 }
 
-export function useConflictHistory(conflictId: number, countryId?: number) {
+export function useConflictHistory(conflictId?: number, countryId?: number) {
   return useQuery<{ years: YearHistory[] }, Error>({
     queryKey: ['conflictHistory', conflictId, countryId],
-    enabled: Number.isFinite(conflictId),
+    enabled: Number.isFinite(conflictId) || Number.isFinite(countryId),
     queryFn: async () => {
       const end = new Date()
       const start = new Date(1989, 0, 1)
@@ -48,7 +48,10 @@ export function useConflictHistory(conflictId: number, countryId?: number) {
         maxPages: 20,
       })
 
-      const filtered = events.filter((e) => e.conflict_new_id === conflictId)
+      const filtered = (conflictId && Number.isFinite(conflictId))
+        ? events.filter((e) => e.conflict_new_id === conflictId)
+        : events
+
       const years = aggregateHistory(filtered)
       return { years }
     },

@@ -6,14 +6,22 @@ export default function SummaryTile({
   conflictName,
   countryName,
 }: {
-  conflictId: number
+  conflictId?: number
   countryId?: number
   conflictName?: string | null
   countryName?: string | null
 }) {
   const { data, isLoading, error } = useConflictSummary(conflictId, countryId, { conflictName, countryName })
 
-  if (isLoading) return <div className="p-3 text-sm">Generating summary858585</div>
+  if (!conflictId && !countryId) {
+    return (
+      <div className="flex h-full flex-col p-3 text-sm text-gray-500 justify-center items-center text-center">
+        <p>Select a conflict or country to view its AI-generated summary.</p>
+      </div>
+    )
+  }
+
+  if (isLoading) return <div className="p-3 text-sm">Generating summary...</div>
   if (error) return <div className="p-3 text-sm text-red-600">Failed to load summary</div>
   if (!data?.summary) return <div className="p-3 text-sm">No summary available.</div>
 
