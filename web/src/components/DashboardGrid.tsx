@@ -18,13 +18,14 @@ export type DashboardGridProps = {
   renderItem: (id: string) => React.ReactNode
   overrideLayout?: GridItem[]
   onPersist?: (layout: GridItem[]) => void
+  visibleTileIds?: string[]
 }
 
 function lsKey(conflictId: string) {
   return `layout:${conflictId}`
 }
 
-export function DashboardGrid({ conflictId, initialLayout, renderItem, overrideLayout, onPersist }: DashboardGridProps) {
+export function DashboardGrid({ conflictId, initialLayout, renderItem, overrideLayout, onPersist, visibleTileIds }: DashboardGridProps) {
   const saved = useMemo(() => {
     const raw = localStorage.getItem(lsKey(conflictId))
     if (!raw) return null
@@ -35,8 +36,14 @@ export function DashboardGrid({ conflictId, initialLayout, renderItem, overrideL
     const base = overrideLayout ?? saved ?? initialLayout
     const ids = new Set(base.map(it => it.i))
     const missing = initialLayout.filter(it => !ids.has(it.i))
-    return missing.length ? [...base, ...missing] : base
-  }, [overrideLayout, saved, initialLayout])
+    const combined = missing.length ? [...base, ...missing] : base
+
+    if (visibleTileIds) {
+      const visibleSet = new Set(visibleTileIds)
+      return combined.filter(it => visibleSet.has(it.i))
+    }
+    return combined
+  }, [overrideLayout, saved, initialLayout, visibleTileIds])
 
   const lastSavedJson = useRef<string | null>(null)
   const onLayoutChange = useCallback((l: Layout[]) => {
