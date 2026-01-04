@@ -14,14 +14,25 @@ function Home() {
   const [world, setWorld] = useState<any[] | null>(null)
   useEffect(() => {
     let mounted = true
-    import('world-atlas/countries-110m.json').then((mod: any) => {
-      if (!mounted) return
-      const topo = mod.default ?? mod
-      const fc = topojsonFeature(topo as any, topo.objects.countries) as { type: 'FeatureCollection'; features: any[] }
-      setWorld(fc.features || [])
-    })
+    import('world-atlas/countries-110m.json')
+      .then((mod: any) => {
+        if (!mounted) return
+        const topo = mod.default ?? mod
+        const fc = topojsonFeature(topo as any, topo.objects.countries) as unknown as { type: 'FeatureCollection'; features: any[] }
+        console.log('TopoJSON loaded:', fc.features?.length, 'countries')
+        setWorld(fc.features || [])
+      })
+      .catch(err => {
+        console.error('Failed to load TopoJSON:', err)
+      })
     return () => { mounted = false }
   }, [])
+
+  useEffect(() => {
+    if (data) console.log('UCDP Events loaded:', data.events?.length)
+    if (error) console.error('UCDP Fetch Error:', error)
+  }, [data, error])
+
 
   // Group events by UCDP country_id, compute centroid and aggregates
   const countries = useMemo(() => {
@@ -119,12 +130,19 @@ function Home() {
   }, [countries, world])
 
   return (
-    <div className="h-screen w-screen">
-      <MapContainer center={[20, 0]} zoom={2} className="h-full w-full">
+    <div className="h-full w-full relative">
+      <MapContainer
+        center={[20, 0]}
+        zoom={2}
+        minZoom={2}
+        maxBounds={[[-90, -180], [90, 180]]}
+        className="h-full w-full grayscale-[0.2] brightness-[0.8]"
+      >
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           noWrap
+          bounds={[[-90, -180], [90, 180]]}
         />
 
         {countriesWithFeature.map((c) => {
@@ -134,15 +152,17 @@ function Home() {
               <GeoJSON
                 key={`geo-${c.countryId}`}
                 data={f as any}
-                style={() => ({ color: '#ef4444', weight: 1, fillColor: '#ef4444', fillOpacity: 0.25 })}
+                style={() => ({ color: '#ffffff', weight: 0.5, fillColor: '#ffffff', fillOpacity: 0.05 })}
                 eventHandlers={{ click: () => navigate(`/country/${c.countryId}`) }}
               >
                 <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">{f.properties?.name || `Country ${c.countryId}`}</div>
-                    <div>Events: {c.count.toLocaleString()}</div>
-                    <div>Conflicts: {c.conflictCount.toLocaleString()}</div>
-                    <div>Fatalities (best): {c.sumBest.toLocaleString()}</div>
+                  <div className="text-xs font-sans p-2 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl text-white">
+                    <div className="font-black uppercase tracking-widest mb-2 border-b border-white/10 pb-2">{f.properties?.name || `Country ${c.countryId}`}</div>
+                    <div className="space-y-1 font-medium opacity-80">
+                      <div>Events: <span className="font-black text-white">{c.count.toLocaleString()}</span></div>
+                      <div>Conflicts: <span className="font-black text-white">{c.conflictCount.toLocaleString()}</span></div>
+                      <div>Fatalities: <span className="font-black text-white">{c.sumBest.toLocaleString()}</span></div>
+                    </div>
                   </div>
                 </Popup>
               </GeoJSON>
@@ -153,17 +173,24 @@ function Home() {
             <CircleMarker
               key={`dot-${c.countryId}`}
               center={[c.lat, c.lon]}
-              pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.6 }}
+              pathOptions={{ color: '#ffffff', weight: 1, fillColor: '#ef4444', fillOpacity: 0.8 }}
               radius={Math.max(4, Math.min(16, Math.sqrt((c.sumBest || 0) + 1)))}
               eventHandlers={{ click: () => navigate(`/country/${c.countryId}`) }}
             >
               <Popup>
-                <div className="text-sm">
-                  <div className="font-semibold">Country ID: {c.countryId}</div>
-                  <div>Events: {c.count.toLocaleString()}</div>
-                  <div>Conflicts: {c.conflictCount.toLocaleString()}</div>
-                  <div>Fatalities (best): {c.sumBest.toLocaleString()}</div>
-                  <button className="mt-2 underline text-blue-600" onClick={() => navigate(`/country/${c.countryId}`)}>View country details</button>
+                <div className="text-xs font-sans p-2 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl text-white">
+                  <div className="font-black uppercase tracking-widest mb-2 border-b border-white/10 pb-2">Country ID: {c.countryId}</div>
+                  <div className="space-y-1 font-medium opacity-80">
+                    <div>Events: {c.count.toLocaleString()}</div>
+                    <div>Conflicts: {c.conflictCount.toLocaleString()}</div>
+                    <div>Fatalities: {c.sumBest.toLocaleString()}</div>
+                  </div>
+                  <button
+                    className="mt-4 w-full bg-white text-black font-black py-2 rounded-lg text-[10px] uppercase tracking-tighter"
+                    onClick={() => navigate(`/country/${c.countryId}`)}
+                  >
+                    DEPLOY OVERVIEW
+                  </button>
                 </div>
               </Popup>
             </CircleMarker>
@@ -172,15 +199,21 @@ function Home() {
       </MapContainer>
 
       {isLoading && (
-        <div className="absolute left-2 top-2 rounded bg-white/90 px-2 py-1 text-xs shadow">
-          Loading events...
+        <div className="absolute left-6 top-6 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl transition-all animate-pulse">
+          Synchronizing Global Data...
         </div>
       )}
       {error && (
-        <div className="absolute left-2 top-2 rounded bg-red-600 text-white px-2 py-1 text-xs shadow">
-          Failed to load events
+        <div className="absolute left-6 top-6 rounded-2xl bg-red-600/20 backdrop-blur-xl border border-red-500/50 text-red-100 px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl">
+          COMMUNICATION FAILURE
         </div>
       )}
+      {!isLoading && !error && events.length === 0 && (
+        <div className="absolute left-6 top-6 rounded-2xl bg-yellow-600/20 backdrop-blur-xl border border-yellow-500/50 text-yellow-100 px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl">
+          NO DATA RECEIVED FROM UCDP
+        </div>
+      )}
+
     </div>
   )
 }

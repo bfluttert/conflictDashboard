@@ -7,6 +7,7 @@ import './tailwind.css'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
+import { DashboardProvider } from './context/DashboardContext'
 
 const queryClient = new QueryClient()
 
@@ -15,7 +16,9 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <DashboardProvider>
+            <App />
+          </DashboardProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

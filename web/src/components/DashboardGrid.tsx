@@ -1,7 +1,7 @@
 import GridLayout, { type Layout, WidthProvider } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
-import { useCallback, useMemo, useRef } from 'react'
+import React, { useCallback, useMemo, useRef } from 'react'
 
 export type GridItem = {
   i: string
@@ -20,6 +20,23 @@ export type DashboardGridProps = {
   onPersist?: (layout: GridItem[]) => void
   visibleTileIds?: string[]
 }
+
+const CustomResizeHandle = React.forwardRef(({ handleAxis, ...rest }: any, ref: any) => (
+  <div
+    ref={ref}
+    className={`absolute bottom-1 right-1 cursor-se-resize p-1.5 group/handle active:scale-90 transition-all z-50 no-drag ${rest.className || ''}`}
+    style={{ ...rest.style }}
+    onMouseDown={rest.onMouseDown}
+    onMouseUp={rest.onMouseUp}
+    onTouchEnd={rest.onTouchEnd}
+  >
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/5 group-hover/handle:text-white/40 group-hover:text-white/30 transition-colors duration-500">
+      <path d="M4 14L14 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M9 14L14 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M13 14L14 13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  </div>
+))
 
 function lsKey(conflictId: string) {
   return `layout:${conflictId}`
@@ -61,7 +78,7 @@ export function DashboardGrid({ conflictId, initialLayout, renderItem, overrideL
   const RGL = WidthProvider(GridLayout)
 
   return (
-    <div className="p-2">
+    <div className="p-4 relative">
       <RGL
         className="layout"
         cols={12}
@@ -70,10 +87,18 @@ export function DashboardGrid({ conflictId, initialLayout, renderItem, overrideL
         isResizable
         draggableCancel=".no-drag"
         onLayoutChange={onLayoutChange}
+        margin={[20, 20]}
+        resizeHandle={<CustomResizeHandle />}
       >
         {effectiveLayout.map(it => (
-          <div key={it.i} data-grid={it} className="bg-white border rounded shadow">
-            {renderItem(it.i)}
+          <div
+            key={it.i}
+            data-grid={it}
+            className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[28px] shadow-2xl overflow-hidden hover:bg-white/[0.05] transition-colors duration-500 group"
+          >
+            <div className="flex-1 h-full overflow-hidden">
+              {renderItem(it.i)}
+            </div>
           </div>
         ))}
       </RGL>

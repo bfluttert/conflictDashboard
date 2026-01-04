@@ -69,16 +69,22 @@ serve(async (req: Request) => {
 
     const forceRefresh = !!body.forceRefresh
 
-    // 1) Check existing cached summary
-    let query = supabase.from('conflict_summaries').select('*')
-    if (conflictId) {
-      query = query.eq('conflict_id', conflictId)
-    } else {
-      // Country summary: conflict_id is null, country_id matches
-      query = query.eq('country_id', countryId).is('conflict_id', null)
+    // MAGIC ID: Use negative country ID for storage to avoid NULL Primary Key violation
+    const storageId = conflictId || (countryId ? -countryId : null)
+
+    if (storageId === null) {
+      return new Response(JSON.stringify({ error: 'Missing valid identifier' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      })
     }
 
-    const { data: existing, error: existingErr } = await query.maybeSingle()
+    // 1) Check existing cached summary
+    const { data: existing, error: existingErr } = await supabase
+      .from('conflict_summaries')
+      .select('*')
+      .eq('conflict_id', storageId)
+      .maybeSingle()
 
     if (existingErr && existingErr.code !== 'PGRST116') {
       console.error('Error reading conflict_summaries', existingErr)
@@ -95,14 +101,13 @@ serve(async (req: Request) => {
       }
     }
 
-    const conflictName = body.conflictName || (existing?.conflict_name as string | undefined)
     const countryName = body.countryName || (countryId ? `country ID ${countryId}` : 'the country in question')
 
     // 2) Generate new summary via OpenAI
     let prompt = ''
     if (conflictId) {
-      const cName = conflictName || `Conflict ${conflictId}`
-      prompt = `Write an 8–10 sentence neutral, factual summary in UK English of the armed conflict called "${cName}" in ${countryName}.
+      const conflictName = body.conflictName || (existing?.summary_text ? 'this conflict' : `Conflict ${conflictId}`)
+      prompt = `Write an 8–10 sentence neutral, factual summary in UK English of the armed conflict called "${conflictName}" in ${countryName}.
 Explain briefly:
 - Who the main parties are
 - Historical and political background
@@ -111,14 +116,18 @@ Explain briefly:
 - Scale of violence and humanitarian impact
 Avoid jargon and do not speculate beyond widely known facts.`
     } else {
-      // Country summary
-      prompt = `Write an 8–10 sentence neutral, factual summary in UK English of the recent armed conflict situation in ${countryName}.
+      // Country summary (Aggregated National Level)
+      prompt = `Act as a senior geopolitical intelligence analyst. Provide a comprehensive, high-level intelligence summary for the situation in ${countryName}, focusing on the aggregated national landscape of conflicts.
+
+The summary should be 8–10 sentences, neutral, factual, and written in UK English.
+
 Focus on:
-- The main active conflicts and armed groups currently operating in the country
-- The general security situation and recent trends in violence
-- Humanitarian impact and displacement
-- Brief historical context of instability
-Avoid jargon and do not speculate beyond widely known facts.`
+1. OVERVIEW: A high-level synthesis of all active conflicts and main armed groups operating within ${countryName} transitionally.
+2. RECENT DEVELOPMENTS: Summarise general security trends and significant shifts in the conflict landscape over the last 12 months.
+3. HUMANITARIAN IMPACT: Describe the cumulative scale of violence, internal and external displacement patterns, and the broader humanitarian crisis.
+4. STRATEGIC CONTEXT: Briefly mention the underlying historical or political drivers of instability that connect these various conflicts.
+
+Maintain a professional intelligence-reporting tone. Avoid jargon, bullet points, and do not speculate beyond verified geopolitical facts.`
     }
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -133,8 +142,8 @@ Avoid jargon and do not speculate beyond widely known facts.`
           { role: 'system', content: 'You are an assistant that writes concise, neutral, factual summaries in UK English.' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 600,
-        temperature: 1,
+        max_tokens: 800,
+        temperature: 0.7,
       }),
     })
 
@@ -167,7 +176,7 @@ Avoid jargon and do not speculate beyond widely known facts.`
     const { error: upsertErr } = await supabase
       .from('conflict_summaries')
       .upsert({
-        conflict_id: conflictId, // null for country summary
+        conflict_id: storageId, // Negative for country summary
         country_id: countryId ?? null,
         summary_text: summary,
         model: MODEL,
@@ -176,6 +185,7 @@ Avoid jargon and do not speculate beyond widely known facts.`
 
     if (upsertErr) {
       console.error('Error upserting conflict_summaries', upsertErr)
+      // Even if cache fails, return the summary to the user
     }
 
     return new Response(JSON.stringify({ summary, model: MODEL, cached: false }), {

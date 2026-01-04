@@ -21,7 +21,7 @@ export type UcdpPagedResponse<T> = {
 }
 
 const BASE = import.meta.env.DEV ? '/ucdp/api' : 'https://ucdpapi.pcr.uu.se/api'
-const GED_VERSION = '25.1'
+const GED_VERSION = '24.1' // Using 24.1 for stable historical data access
 
 export type GedQuery = {
   startDate: string // YYYY-MM-DD
@@ -50,7 +50,9 @@ export async function fetchGedEventsPaged(q: GedQuery): Promise<GedEvent[]> {
     const res = await fetch(url)
     if (!res.ok) throw new Error(`UCDP request failed: ${res.status}`)
     const data = (await res.json()) as UcdpPagedResponse<GedEvent>
-    out.push(...data.Result)
+    if (data.Result && Array.isArray(data.Result)) {
+      out.push(...data.Result)
+    }
     if (!data.NextPageUrl) break
     url = import.meta.env.DEV
       ? data.NextPageUrl.replace('https://ucdpapi.pcr.uu.se', '/ucdp')
